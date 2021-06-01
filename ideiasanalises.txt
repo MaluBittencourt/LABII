@@ -1,0 +1,13 @@
+Aba tipos e codigos EA por natureza
+teste para comparação de duas proporções
+com o objetivo de verificar se a proporção de eventos adversos acusados pelos dois métodos é significativamente diferente por natureza
+
+aba indivíduos
+
+verificar total eventos relatados por sexo e grupo etario
+
+comparar proporção de eventos registrados pelo ggt / método tradicional por chalson, caráter da internação e motivo da internação
+
+aba eventos
+
+comparar proporção eventos registrados pelo método tradicional com o gtt por local em prontuário com o bjetivo de verificar se o ggt registra mais eventos em um local do prontuário que em outro
