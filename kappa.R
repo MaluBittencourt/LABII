@@ -1,4 +1,4 @@
-
+#kappa
 
 vetores=function(banco,vetor){
   lista=list()
