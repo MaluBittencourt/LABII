@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 d <- c(1,2,3,4,5)
-a <- c(6,8,10)
+
 ```
 
 ## R Markdown
