@@ -1,5 +1,13 @@
+library(gt)
+library(epiR)
+library(readxl)
+library(plyr)
+library(dplyr)
+library(gridExtra)
+
 #kappa
 
+# subdividindo a base por tipo de evento/dano
 vetores=function(banco,vetor){
   lista=list()
   a=levels(vetor)
@@ -12,7 +20,8 @@ vetores=function(banco,vetor){
   }
   return(lista)
 }
-  
+
+# extraindo os valores do GTT e Ref
 vetores2=function(lista){
   lista2=list()
   k=1
@@ -34,7 +43,7 @@ vetores2=function(lista){
 }
 
 
-
+# obtendo o vetor de concordancia
 tabs=function(lista){
   lista3=list()
   k=1
@@ -61,7 +70,7 @@ tabs=function(lista){
 }
 
 
-
+# criando a matriz de contingencia
 tabs2=function(lista){
   k=1
   lista4=list()
@@ -92,52 +101,125 @@ tabs2=function(lista){
   return(lista4)
 }
 
+# criando a tabela de contingencia com as marginais
+freq=function(lista){
+  lista5=list()
+  for (i in 1:length(lista)) {
+    df=lista[[i]]
+    df=addmargins(df)
+    colnames(df)=c("Sim","Não","Total")
+    rownames(df)=c("Sim","Não", "Total")
+    
+    df=as.data.frame(df)
+    lista5[[i]]=df
+  }
+  return(lista5)
+}
+
+# imprime as tabelas de contingencia
+tabelas=function(lista,rotulos){
+  lista6=list()
+  for (i in 1:length(lista)) {
+    df=lista[[i]]
+    tb=gt(df, rownames_to_stub = T)%>%tab_stubhead("Ref./GTT")
+    tb=tb%>%tab_header(rotulos[i])
+    arquivo=paste0(rotulos[i],".png")
+   gtsave(data = tb, filename = arquivo, path = "C:/Users/malub/Documents/LAB II")
+  }
+}
+
+# teste kappa de fleiss
+kappa=function(lista){
+  lista7=list()
+  for (i in 1:length(lista)) {
+    df=lista[[i]]
+    k=epi.kappa(dat=df,alternative = "two.sided", method = "fleiss")
+    lista7[[i]]=k
+  }
+  return(lista7)
+}
+
+# criando a tabela do teste kappa por evento/dano
+tb_kappa=function(list_n,list_k,vet_t){
+  tbl=c()
+  for (i in 1:length(list_n)) {
+    n=list_n[[i]]
+    u=list_k[[i]]
+    e=round(u$z[2],3)
+    e=ifelse(e==0,"<0.001",e)
+    s=round(u$pabak,3)
+    f=paste0(s$est, "[", s$lower, ";",s$upper, "]")
+    p=cbind(n,f,e)
+    colnames(p)=c("n","Kappa ajust.","valor-p")
+    rownames(p)=vet_t[i]
+    tbl=rbind(tbl,p)
+  }
+  return(as.data.frame(tbl))
+}
 
 setwd("C:/Users/malub/Documents/LAB II")
-library(readxl)
+
+# tabela eventos e-i
 bd=read_xlsx("C:/Users/malub/Documents/LAB II/Estatística.xlsx", sheet = "Acurácia Eventos E-I")
 bd$`# Evento`=as.factor(bd$`# Evento`)
 bd$Classif_natureza=as.factor(bd$Classif_natureza)
 bd$`Dano E-1;F-2;G-3;H-4`=as.factor(bd$`Dano E-1;F-2;G-3;H-4`)
 
-library(plyr)
-
-str(bd)
-
+# por evento
 w=vetores(bd,bd$`# Evento`)
 z=vetores2(w)
 x=tabs(z)
 y=tabs2(x)
-y
+t=freq(y)
+evento=c(paste0("Evento ",seq(1:18), " - EI"))
+tabelas(t,evento)
 
-lapply(x, length)
+m=lapply(x, length)
+v=kappa(y)
+d=tb_kappa(m,v,evento)
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "EI por evento.png", path = "C:/Users/malub/Documents/LAB II")
 
-library(epiR)
-lapply(y, epi.kappa)
-
+# por natureza
 w=vetores(bd,bd$Classif_natureza)
 z=vetores2(w)
 x=tabs(z)
 y=tabs2(x)
-y
-lapply(w, length)
-lapply(z, length)
-lapply(x, length)
+t=freq(y)
+natureza=c("Infecções","Medicamentosos","Assistência obstétrica",
+          "Cirúrgicos/anestésicos","Relacionados à transfusão de hemoderivados",
+          "Cateteres gástricos/enterais","Atraso na assistência",
+          "Transplante de células","Flebite",
+          "Lesão de pele por lesão mecânica","Queda","Lesão de pressão",
+          "Radioterapia","Acessos venosos periféricos","Via área",
+          "Terapia dialítica","Sondagem vesical","Acessos vasculares centrais")
+natureza = paste0("EI - ", natureza)
+tabelas(t,natureza)
 
-lapply(y, epi.kappa)
+m=lapply(x, length)
+v=kappa(y)
+d=tb_kappa(m,v,natureza)
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "EI por natureza.png", path = "C:/Users/malub/Documents/LAB II")
 
+# por dano
 w=vetores(bd,bd$`Dano E-1;F-2;G-3;H-4`)
 z=vetores2(w)
 x=tabs(z)
 y=tabs2(x)
-y
-lapply(w, length)
-lapply(z, length)
-lapply(x, length)
+t=freq(y)
+dano=c("E","F","G","H")
+dano=paste0("Eventos E-I -  ",dano)
+tabelas(t,dano)
 
-lapply(y, epi.kappa)
+m=lapply(x, length)
+v=kappa(y)
+d=tb_kappa(m,v,dano)
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "EventoEI.png", path = "C:/Users/malub/Documents/LAB II")
 
 
+# obtendo vetor dano e-i
 dano_ei=c()
 for (i in 1:length(bd$`Dano E-1;F-2;G-3;H-4`)) {
   if (bd$`Dano E-1;F-2;G-3;H-4`[i]!=0) {
@@ -148,6 +230,7 @@ for (i in 1:length(bd$`Dano E-1;F-2;G-3;H-4`)) {
   }
 }
 
+# obtendo vetor dano f-i
 dano_fi=c()
 for (i in 1:length(bd$`Dano E-1;F-2;G-3;H-4`)) {
   if (bd$`Dano E-1;F-2;G-3;H-4`[i]==0) {
@@ -165,28 +248,87 @@ bd=cbind(bd,dano_ei,dano_fi)
 bd$dano_ei=as.factor(bd$dano_ei)
 bd$dano_fi=as.factor(bd$dano_fi)
 
-w=vetores(bd,bd$dano_ei)
+# por dano e-i
+w1=vetores(bd,bd$dano_ei)
+z1=vetores2(w1)
+x1=tabs(z1)
+y1=tabs2(x1)
+t1=freq(y1)
+dano_ei1=c("Total Eventos E-I")
+tabelas(t1,dano_ei1)
+
+
+#por dano f-i
+w2=vetores(bd,bd$dano_fi)
+z2=vetores2(w2)
+x2=tabs(z2)
+y2=tabs2(x2)
+t2=freq(y2)
+dano_fi1=c("Total Eventos F-I")
+tabelas(t2,dano_fi1)
+
+# tabela eventos f-i
+bd=read_xlsx("C:/Users/malub/Documents/LAB II/Estatística.xlsx", sheet = "Acurácia Eventos F-I")
+bd$`# Evento`=as.factor(bd$`# Evento`)
+bd$Classif_natureza=as.factor(bd$Classif_natureza)
+bd$`Dano E-1;F-2;G-3;H-4`=as.factor(bd$`Dano E-1;F-2;G-3;H-4`)
+
+# por evento
+w=vetores(bd,bd$`# Evento`)
 z=vetores2(w)
 x=tabs(z)
 y=tabs2(x)
-y
-lapply(w, length)
-lapply(z, length)
-lapply(x, length)
+t=freq(y)
+evento=c(paste0("Evento ",seq(1:18), " - FI"))
+tabelas(t,evento)
 
-lapply(y, epi.kappa)
+m=lapply(x, length)
+v=kappa(y)
+d=tb_kappa(m,v,evento)
+d=d[-c(8,9),]
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "FI por evento.png", path = "C:/Users/malub/Documents/LAB II")
 
 
-w=vetores(bd,bd$dano_fi)
+# por natureza
+w=vetores(bd,bd$Classif_natureza)
 z=vetores2(w)
 x=tabs(z)
 y=tabs2(x)
-y
-lapply(w, length)
-lapply(z, length)
-lapply(x, length)
+t=freq(y)
+natureza=c("Infecções","Medicamentosos","Assistência obstétrica",
+          "Cirúrgicos/anestésicos","Relacionados à transfusão de hemoderivados",
+          "Cateteres gástricos/enterais","Atraso na assistência",
+          "Transplante de células","Flebite",
+          "Lesão de pele por lesão mecânica","Queda","Lesão de pressão",
+          "Radioterapia","Acessos venosos periféricos","Via área",
+          "Terapia dialítica","Sondagem vesical","Acessos vasculares centrais")
+natureza = paste0("FI - ", natureza)
+tabelas(t,natureza)
 
-lapply(y, epi.kappa)
+m=lapply(x, length)
+v=kappa(y)
+d=tb_kappa(m,v,natureza)
+d=d[-c(6,8:12,14,16),]
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "FI por natureza.png", path = "C:/Users/malub/Documents/LAB II")
+
+# por dano
+w=vetores(bd,bd$`Dano E-1;F-2;G-3;H-4`)
+z=vetores2(w)
+x=tabs(z)
+y=tabs2(x)
+t=freq(y)
+dano=c("E","F","G","H")
+dano=paste0("Eventos F-I - ",dano)
+tabelas(t,dano)
+
+m=lapply(x, length)
+v=kappa(y)
+d=tb_kappa(m,v,dano)
+d=d[-1,]
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "EventoFI.png", path = "C:/Users/malub/Documents/LAB II")
 
 
 bd=read_xlsx("C:/Users/malub/Documents/LAB II/Estatística.xlsx", sheet = "Indivíduos")
@@ -257,16 +399,33 @@ evento_ei=tb(bd$evento_ei_gtt,bd$evento_ei_ref)
 evento_fi=tb(bd$evento_fi_gtt,bd$evento_fi_ref)
 
 ei=tb2(evento_ei)
-ei
+ei=list(ei)
+t=freq(ei)
+dano_ei2=c("Eventos E-I por indivíduo")
+tabelas(t,dano_ei2)
 fi=tb2(evento_fi)
-fi
+fi=list(fi)
+t=freq(fi)
+dano_fi2=c("Eventos F-I por indivíduo")
+tabelas(t,dano_fi2)
 
-epi.kappa(ei)
-epi.kappa(fi)
+v3=lapply(ei, epi.kappa)
+v4=lapply(fi, epi.kappa)
+m1=lapply(x1, length)
+m2=lapply(x2, length)
+m=c(m1,211,m2,211)
+v1=kappa(y1)
+v2=kappa(y2)
+v=c(v1,v3,v2,v4)
+dano=c(dano_ei1,dano_ei2,dano_fi1,dano_fi2)
+
+d=tb_kappa(m,v,dano)
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "Eventos.png", path = "C:/Users/malub/Documents/LAB II")
 
 
 bd=read_xlsx("C:/Users/malub/Documents/LAB II/Estatística.xlsx", sheet = "Eventos")
-bd=bd[!is.na(bd$`Local em prontuário`),]
+bd$`Local em prontuário`[is.na(bd$`Local em prontuário`)] = "GTT"
 bd$`Local em prontuário`=as.factor(bd$`Local em prontuário`)
 
 vetores3=function(banco,vetor){
@@ -286,9 +445,13 @@ w=vetores3(bd,bd$`Local em prontuário`)
 z=vetores2(w)
 x=tabs(z)
 y=tabs2(x)
-y
-lapply(w, length)
-lapply(z, length)
-lapply(x, length)
+t=freq(y)
+local=levels(bd$`Local em prontuário`)
+local=paste0("Local em prontuário - ",local)
+tabelas(t,local)
 
-lapply(y, epi.kappa)
+m=lapply(x, length)
+v=kappa(y)
+d=tb_kappa(m,v,local)
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "Porlocal.png", path = "C:/Users/malub/Documents/LAB II")
