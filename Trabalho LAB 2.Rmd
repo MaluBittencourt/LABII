@@ -6,29 +6,522 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-
-d <- c(1,2,3,4,5)
-b <- 8
+#install.packages("gt")
+#install.packages("epiR")
+#install.packages("readxl")
+#install.packages("plyr")
+#install.packages("dplyr")
+#install.packages("gridExtra")
+#install.packages("webshot")
+library(gt)
+library(epiR)
+library(readxl)
+library(plyr)
+library(dplyr)
+library(gridExtra)
+library(webshot)
+webshot::install_phantomjs()
 
 ```
 
-## R Markdown
+#kappa
+Subdividindo a base por tipo de evento/dano
+```{r}
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+vetores=function(banco,vetor){
+  lista=list()
+  a=levels(vetor)
+  a=as.integer(a)
+  k=1
+  for (i in 1:max(a)) {
+    for (j in 1:length(banco)) 
+      lista[[k]]=banco[vetor==i,]
+      k=k+1
+  }
+  return(lista)
+}
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+# extraindo os valores do GTT e Ref
+```{r}
+vetores2=function(lista){
+  lista2=list()
+  k=1
+  for (i in 1:length(lista)) {
+    df=lista[[i]]
+    b=length(unique(df$`# paciente`))
+    c=length(df$`# paciente`)
+    d=abs(b-c)
+    e=cbind(df$GTT,df$Ref.)
+    
+    for (i in (1+nrow(e)):(d+211)) {
+      e=rbind(e,c(0,0))
+      
+    }
+    lista2[[k]]=e
+    k=k+1
+  }
+  return(lista2)
+}
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# obtendo o vetor de concordancia
+```{r}
+tabs=function(lista){
+  lista3=list()
+  k=1
+  for (i in 1:length(lista)) {
+    df=lista[[i]]
+    p=c()
+    for (j in 1:nrow(df)) {
+      if (df[j,1]==1&df[j,2]==1) {
+        p[j]="a"
+      } else if (df[j,1]==1&df[j,2]==0) {
+        p[j]="b"
+      } else if (df[j,1]==0&df[j,2]==1) {
+        p[j]="c"
+      } else if (df[j,1]==0&df[j,2]==0) {
+        p[j]="d"
+      }
+      
+    }
+    lista3[[k]]=p
+    k=k+1
+    
+  }
+  return(lista3)
+}
+
+```
+
+
+# criando a matriz de contingencia
+```{r}
+tabs2=function(lista){
+  k=1
+  lista4=list()
+  for (i in 1:length(lista)) {
+    a=0
+    b=0
+    c=0
+    d=0
+    df=lista[[i]]
+    for (j in 1:length(df)) {
+      if (df[j]=="a") {
+        a=a+1
+      }
+      else if (df[j]=="b") {
+        b=b+1
+      }
+      else if (df[j]=="c") {
+        c=c+1
+      }
+      else if (df[j]=="d") {
+        d=d+1
+      }
+    }
+    m=matrix(c(a,b,c,d),2,2)
+    lista4[[k]]=m
+    k=k+1
+  }
+  return(lista4)
+}
+
+```
+
+# criando a tabela de contingencia com as marginais
+```{r}
+freq=function(lista){
+  lista5=list()
+  for (i in 1:length(lista)) {
+    df=lista[[i]]
+    df=addmargins(df)
+    colnames(df)=c("Sim","Não","Total")
+    rownames(df)=c("Sim","Não", "Total")
+        df=as.data.frame(df)
+    lista5[[i]]=df
+  }
+  return(lista5)
+}
+```
+    
+# imprime as tabelas de contingencia
+```{r}
+tabelas=function(lista,rotulos){
+  lista6=list()
+  for (i in 1:length(lista)) {
+    df=lista[[i]]
+    tb=gt(df, rownames_to_stub = T)%>%tab_stubhead("Ref./GTT")
+    tb=tb%>%tab_header(rotulos[i])
+    arquivo=paste0(rotulos[i],".png")
+   gtsave(data = tb, filename = arquivo, path = "C:/Users/malub/Documents/LAB II")
+  }
+}
+
+```
+
+# teste kappa de fleiss
+```{r}
+kappa=function(lista){
+  lista7=list()
+  for (i in 1:length(lista)) {
+    df=lista[[i]]
+    k=epi.kappa(dat=df,alternative = "two.sided", method = "fleiss")
+    lista7[[i]]=k
+  }
+  return(lista7)
+}
+```
+
+# criando a tabela do teste kappa por evento/dano
+```{r}
+tb_kappa=function(list_n,list_k,vet_t){
+  tbl=c()
+  for (i in 1:length(list_n)) {
+    n=list_n[[i]]
+    u=list_k[[i]]
+    e=round(u$z[2],3)
+    e=ifelse(e==0,"<0.001",e)
+    s=round(u$pabak,3)
+    f=paste0(s$est, "[", s$lower, ";",s$upper, "]")
+    p=cbind(n,f,e)
+    colnames(p)=c("n","Kappa ajust.","valor-p")
+    rownames(p)=vet_t[i]
+    tbl=rbind(tbl,p)
+  }
+  return(as.data.frame(tbl))
+}
+
+##setwd("C:/Users/malub/Documents/LAB II")
+```
+
+
+# tabela eventos e-i
+```{r}
+bd=read_xlsx("Estatística.xlsx", sheet = "Acurácia Eventos E-I")
+bd$`# Evento`=as.factor(bd$`# Evento`)
+bd$Classif_natureza=as.factor(bd$Classif_natureza)
+bd$`Dano E-1;F-2;G-3;H-4`=as.factor(bd$`Dano E-1;F-2;G-3;H-4`)
+```
+
+
+# por evento
+```{r}
+w=vetores(bd,bd$`# Evento`)
+z=vetores2(w)
+x=tabs(z)
+y=tabs2(x)
+t=freq(y)
+evento=c(paste0("Evento ",seq(1:18), " - EI"))
+tabelas(t,evento)
+
+m=lapply(x, length)
+v=kappa(y)
+d=tb_kappa(m,v,evento)
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "EI por evento.png", path = "C:/Users/malub/Documents/LAB II")
+```
+
+
+# por natureza
+```{r}
+w=vetores(bd,bd$Classif_natureza)
+z=vetores2(w)
+x=tabs(z)
+y=tabs2(x)
+t=freq(y)
+natureza=c("Infecções","Medicamentosos","Assistência obstétrica",
+          "Cirúrgicos/anestésicos","Relacionados à transfusão de hemoderivados",
+          "Cateteres gástricos/enterais","Atraso na assistência",
+          "Transplante de células","Flebite",
+          "Lesão de pele por lesão mecânica","Queda","Lesão de pressão",
+          "Radioterapia","Acessos venosos periféricos","Via área",
+          "Terapia dialítica","Sondagem vesical","Acessos vasculares centrais")
+natureza = paste0("EI - ", natureza)
+tabelas(t,natureza)
+
+m=lapply(x, length)
+v=kappa(y)
+d=tb_kappa(m,v,natureza)
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "EI por natureza.png", path = "C:/Users/malub/Documents/LAB II")
+```
+
+
+# por dano
+```{r}
+w=vetores(bd,bd$`Dano E-1;F-2;G-3;H-4`)
+z=vetores2(w)
+x=tabs(z)
+y=tabs2(x)
+t=freq(y)
+dano=c("E","F","G","H")
+dano=paste0("Eventos E-I -  ",dano)
+tabelas(t,dano)
+
+m=lapply(x, length)
+v=kappa(y)
+d=tb_kappa(m,v,dano)
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "EventoEI.png", path = "C:/Users/malub/Documents/LAB II")
+```
+
+
+
+# obtendo vetor dano e-i
+```{r}
+dano_ei=c()
+for (i in 1:length(bd$`Dano E-1;F-2;G-3;H-4`)) {
+  if (bd$`Dano E-1;F-2;G-3;H-4`[i]!=0) {
+    dano_ei[i]=1
+  } 
+  else if (bd$`Dano E-1;F-2;G-3;H-4`[i]==0) {
+    dano_ei[i]=0
+  }
+}
+```
+
+
+# obtendo vetor dano f-i
+```{r}
+dano_fi=c()
+for (i in 1:length(bd$`Dano E-1;F-2;G-3;H-4`)) {
+  if (bd$`Dano E-1;F-2;G-3;H-4`[i]==0) {
+    dano_fi[i]=0
+  } 
+  else if (bd$`Dano E-1;F-2;G-3;H-4`[i]==1) {
+    dano_fi[i]=0
+  }
+  else if (bd$`Dano E-1;F-2;G-3;H-4`[i]!=1&bd$`Dano E-1;F-2;G-3;H-4`[i]!=0) {
+    dano_fi[i]=1
+  }
+}
+bd=cbind(bd,dano_ei,dano_fi)
+bd$dano_ei=as.factor(bd$dano_ei)
+bd$dano_fi=as.factor(bd$dano_fi)
+```
+
+# por dano e-i
+```{r}
+w1=vetores(bd,bd$dano_ei)
+z1=vetores2(w1)
+x1=tabs(z1)
+y1=tabs2(x1)
+t1=freq(y1)
+dano_ei1=c("Total Eventos E-I")
+tabelas(t1,dano_ei1)
+
+```
+
+
+#por dano f-i
+```{r}
+w2=vetores(bd,bd$dano_fi)
+z2=vetores2(w2)
+x2=tabs(z2)
+y2=tabs2(x2)
+t2=freq(y2)
+dano_fi1=c("Total Eventos F-I")
+tabelas(t2,dano_fi1)
+```
+
+
+# tabela eventos f-i
+```{r}
+bd=read_xlsx("Estatística.xlsx", sheet = "Acurácia Eventos F-I")
+bd$`# Evento`=as.factor(bd$`# Evento`)
+bd$Classif_natureza=as.factor(bd$Classif_natureza)
+bd$`Dano E-1;F-2;G-3;H-4`=as.factor(bd$`Dano E-1;F-2;G-3;H-4`)
+```
+
+# por evento
+```{r}
+w=vetores(bd,bd$`# Evento`)
+z=vetores2(w)
+x=tabs(z)
+y=tabs2(x)
+t=freq(y)
+evento=c(paste0("Evento ",seq(1:18), " - FI"))
+tabelas(t,evento)
+
+m=lapply(x, length)
+v=kappa(y)
+d=tb_kappa(m,v,evento)
+d=d[-c(8,9),]
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "FI por evento.png", path = "C:/Users/malub/Documents/LAB II")
+
+```
+
+
+# por natureza
+```{r}
+w=vetores(bd,bd$Classif_natureza)
+z=vetores2(w)
+x=tabs(z)
+y=tabs2(x)
+t=freq(y)
+natureza=c("Infecções","Medicamentosos","Assistência obstétrica",
+          "Cirúrgicos/anestésicos","Relacionados à transfusão de hemoderivados",
+          "Cateteres gástricos/enterais","Atraso na assistência",
+          "Transplante de células","Flebite",
+          "Lesão de pele por lesão mecânica","Queda","Lesão de pressão",
+          "Radioterapia","Acessos venosos periféricos","Via área",
+          "Terapia dialítica","Sondagem vesical","Acessos vasculares centrais")
+natureza = paste0("FI - ", natureza)
+tabelas(t,natureza)
+
+m=lapply(x, length)
+v=kappa(y)
+d=tb_kappa(m,v,natureza)
+d=d[-c(6,8:12,14,16),]
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "FI por natureza.png", path = "C:/Users/malub/Documents/LAB II")
+```
+
+
+# por dano
+```{r}
+w=vetores(bd,bd$`Dano E-1;F-2;G-3;H-4`)
+z=vetores2(w)
+x=tabs(z)
+y=tabs2(x)
+t=freq(y)
+dano=c("E","F","G","H")
+dano=paste0("Eventos F-I - ",dano)
+tabelas(t,dano)
+
+m=lapply(x, length)
+v=kappa(y)
+d=tb_kappa(m,v,dano)
+d=d[-1,]
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "EventoFI.png", path = "C:/Users/malub/Documents/LAB II")
+
+
+bd=read_xlsx("Estatística.xlsx", sheet = "Indivíduos")
+
+evento_01=function(vetor){
+  evento=c()
+  for (i in 1:length(vetor)) {
+    if (vetor[i]==0) {
+      evento[i]=0
+    }
+    else if (vetor[i]==1) {
+      evento[i]=1
+    }
+    else if (vetor[i]!=0&vetor[i]!=1) {
+      evento[i]=1
+    }
+  }
+  return(evento)
+}
+
+evento_ei_gtt=evento_01(bd$`Eventos_GTT_E-I`)
+evento_fi_gtt=evento_01(bd$`Eventos_GTT_F-I`)
+evento_ei_ref=evento_01(bd$`Eventos_Ref_E-I`)
+evento_fi_ref=evento_01(bd$`Eventos_Ref_F-I`)
+
+bd=cbind(bd,evento_ei_gtt,evento_fi_gtt,evento_ei_ref,evento_fi_ref)
+
+tb=function(vetor1,vetor2){
+  p=c()
+  for (i in 1:length(vetor1)) {
+    if (vetor1[i]==1&vetor2[i]==1) {
+      p[i]="a"
+    } else if (vetor1[i]==1&vetor2[i]==0) {
+      p[i]="b"
+    } else if (vetor1[i]==0&vetor2[i]==1) {
+      p[i]="c"
+    } else if (vetor1[i]==0&vetor2[i]==0) {
+      p[i]="d"
+    }
+  }
+  return(p)
+}
+
+tb2=function(vetor){
+  a=0
+  b=0
+  c=0
+  d=0
+  for (i in 1:length(vetor)) {
+    if (vetor[i]=="a") {
+      a=a+1
+    }
+    else if (vetor[i]=="b") {
+      b=b+1
+    }
+    else if (vetor[i]=="c") {
+      c=c+1
+    }
+    else if (vetor[i]=="d") {
+      d=d+1
+    }
+  }
+  m=matrix(c(a,b,c,d),2,2)
+  return(m)
+}
+
+evento_ei=tb(bd$evento_ei_gtt,bd$evento_ei_ref)
+evento_fi=tb(bd$evento_fi_gtt,bd$evento_fi_ref)
+
+ei=tb2(evento_ei)
+ei=list(ei)
+t=freq(ei)
+dano_ei2=c("Eventos E-I por indivíduo")
+tabelas(t,dano_ei2)
+fi=tb2(evento_fi)
+fi=list(fi)
+t=freq(fi)
+dano_fi2=c("Eventos F-I por indivíduo")
+tabelas(t,dano_fi2)
+
+v3=lapply(ei, epi.kappa)
+v4=lapply(fi, epi.kappa)
+m1=lapply(x1, length)
+m2=lapply(x2, length)
+m=c(m1,211,m2,211)
+v1=kappa(y1)
+v2=kappa(y2)
+v=c(v1,v3,v2,v4)
+dano=c(dano_ei1,dano_ei2,dano_fi1,dano_fi2)
+
+d=tb_kappa(m,v,dano)
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "Eventos.png", path = "C:/Users/malub/Documents/LAB II")
+
+
+bd=read_xlsx("Estatística.xlsx", sheet = "Eventos")
+bd$`Local em prontuário`[is.na(bd$`Local em prontuário`)] = "GTT"
+bd$`Local em prontuário`=as.factor(bd$`Local em prontuário`)
+
+vetores3=function(banco,vetor){
+  lista=list()
+  a=levels(vetor)
+  k=1
+  for (i in 1:length(a)) {
+    for (j in 1:length(banco)) 
+      lista[[k]]=banco[vetor==a[i],]
+    k=k+1
+  }
+  return(lista)
+}
+
+
+w=vetores3(bd,bd$`Local em prontuário`)
+z=vetores2(w)
+x=tabs(z)
+y=tabs2(x)
+t=freq(y)
+local=levels(bd$`Local em prontuário`)
+local=paste0("Local em prontuário - ",local)
+tabelas(t,local)
+
+m=lapply(x, length)
+v=kappa(y)
+d=tb_kappa(m,v,local)
+d2=gt(d,rownames_to_stub = T)
+gtsave(data = d2, filename = "Porlocal.png", path = "C:/Users/malub/Documents/LAB II")
+```
+
